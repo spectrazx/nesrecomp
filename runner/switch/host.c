@@ -13,6 +13,8 @@
 #include <netinet/in.h>
 #endif
 #include "cyc_core.h"
+#include "cyc_host_extras.h"
+#include "cyc_render.h"
 #include "cyc_host.h"
 #include "cyc_ring.h"
 #include "cyc_run.h"
@@ -352,8 +354,10 @@ int cyc_sdl_main(const char *title, int scale)
     if (!SDL_GetRendererInfo(renderer, &renderer_info))
         runner_log("Renderer=%s flags=%u vsync_off_result=%d PPU=%s\n",
             renderer_info.name, renderer_info.flags, vsync_result, cyc_ppu_implementation());
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 256, 240);
+    int texture_w = 256, texture_h = 240;
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, texture_w, texture_h);
     if (!texture) { fatal = "Cannot create the NES frame texture."; goto cleanup; }
+    const CycHostExtras *extras = cyc_session_extras();
 
     SDL_AudioSpec want = {0}, have;
     want.freq = 48000; want.format = AUDIO_S16SYS; want.channels = 2; want.samples = 1024;
@@ -473,12 +477,26 @@ int cyc_sdl_main(const char *title, int scale)
         timings.audio += stage_end - stage; stage = stage_end;
         int width, height;
         SDL_GetRendererOutputSize(renderer, &width, &height);
-        /* 4:3 displayed picture; preserve the complete 256x240 framebuffer. */
-        int h = height, w = h * 4 / 3;
-        if (w > width) { w = width; h = w * 3 / 4; }
+        /* A game's host extras may present a wider picture (e.g. a widescreen
+         * compositor), drawn with square pixels; the stock 256x240 frame is
+         * shown at 4:3. */
+        int pic_w = 256, pic_h = 240;
+        const uint32_t *pic = extras && extras->present ? extras->present(extras->ctx, &pic_w, &pic_h) : NULL;
+        if (!pic || pic_w <= 0 || pic_h <= 0 || pic_w > CYC_PRESENT_MAX_DIMENSION || pic_h > CYC_PRESENT_MAX_DIMENSION)
+            pic = cyc_render_present(&pic_w, &pic_h);
+        if (pic_w != texture_w || pic_h != texture_h) {
+            SDL_DestroyTexture(texture);
+            texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, pic_w, pic_h);
+            if (!texture) { fatal = "Cannot create the NES frame texture."; break; }
+            texture_w = pic_w; texture_h = pic_h;
+            runner_log("Presented picture %dx%d\n", pic_w, pic_h);
+        }
+        int num = pic_w == 256 ? 4 : pic_w, den = pic_w == 256 ? 3 : pic_h;
+        int h = height, w = (int)((long long)h * num / den);
+        if (w > width) { w = width; h = (int)((long long)w * den / num); }
         SDL_Rect dest = {(width - w) / 2, (height - h) / 2, w, h};
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); SDL_RenderClear(renderer);
-        if (SDL_UpdateTexture(texture, NULL, cyc_frame_argb(), 256 * sizeof(uint32_t)) ||
+        if (SDL_UpdateTexture(texture, NULL, pic, pic_w * (int)sizeof(uint32_t)) ||
             SDL_RenderCopy(renderer, texture, NULL, &dest)) { fatal = "Video presentation failed."; break; }
         SDL_RenderPresent(renderer);
         Uint64 now = SDL_GetPerformanceCounter();

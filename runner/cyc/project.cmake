@@ -63,8 +63,11 @@ function(nesrecomp_add_cycle_game target)
     if(CYC_UNPARSED_ARGUMENTS OR NOT CYC_ROM)
         message(FATAL_ERROR "nesrecomp_add_cycle_game requires ROM; unknown arguments: ${CYC_UNPARSED_ARGUMENTS}")
     endif()
-    if(NINTENDO_SWITCH AND (CYC_HEADLESS OR CYC_MODS OR CYC_HD_PACKS OR CYC_HOST_EXTRAS OR CYC_BIOS))
-        message(FATAL_ERROR "Switch cycle games require SDL and a vanilla cartridge target (no HEADLESS, MODS, HD_PACKS, HOST_EXTRAS or BIOS)")
+    # The Switch host runs a game's host extras (options, per-frame hooks and a
+    # wider presented picture) and trusted mod plugins compiled into the NRO,
+    # without a package catalog, launcher or HD packs.
+    if(NINTENDO_SWITCH AND (CYC_HEADLESS OR CYC_HD_PACKS OR CYC_BIOS))
+        message(FATAL_ERROR "Switch cycle games require SDL and a cartridge target (no HEADLESS, HD_PACKS or BIOS)")
     endif()
     set(cyc_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
     get_filename_component(root "${cyc_dir}/../.." ABSOLUTE)
