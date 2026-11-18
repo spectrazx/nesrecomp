@@ -478,15 +478,13 @@ static void fp_input_tile(unsigned tick,uint64_t clock)
     for (unsigned i = 0; i < 8; ++i) {
         uint16_t c = (uint16_t)((color[i] & mask) | emphasis);
         hw_frame_index[out + i] = c;
-        if (cyc_background_enabled) {
-            cyc_background_pipe[3] = background[i];
-            cyc_render_background_output(out + i, emphasis >> 6, ppu.greyscale != 0);
-        }
         if (hw_zapper.port) {
             ++hw_zapper.dots;
             hw_zapper_pixel((int)(first + i - 4), ppu.scanline, c);
         }
     }
+    if (cyc_background_enabled)
+        cyc_render_background_output8(out, background, emphasis >> 6, ppu.greyscale != 0);
     for (unsigned i = 0; i < 4; ++i) {
         ppu.color[i] = color[10 - i];
         if (cyc_background_enabled) cyc_background_pipe[i] = background[10 - i];

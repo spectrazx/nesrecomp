@@ -80,6 +80,10 @@ bool cyc_render_background(uint32_t *out); /* 256x240 ARGB, false if disabled */
 extern bool cyc_background_enabled;
 extern uint8_t cyc_background_pipe[4];
 void cyc_render_background_output(unsigned pixel, unsigned emphasis, bool grey);
+/* Eight consecutive pixels from `pixel`, as eight cyc_render_background_output
+ * calls with cyc_background_pipe[3] = values[i] (the pipe itself is not
+ * written). */
+void cyc_render_background_output8(unsigned pixel, const uint8_t values[8], unsigned emphasis, bool grey);
 
 /* ---- what the frame used ---- */
 /* The background's X at native column 0 of visible line y, 0-511 across the

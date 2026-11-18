@@ -134,6 +134,11 @@ void cyc_render_background_output(unsigned pixel,unsigned emphasis,bool grey) {
     background_frame[pixel]=(uint16_t)(value|(emphasis<<6));
     if(pixel==256*240-1)background_valid=true;
 }
+void cyc_render_background_output8(unsigned pixel,const uint8_t values[8],unsigned emphasis,bool grey) {
+    uint8_t mask=grey?0x30:0xff;uint16_t high=(uint16_t)(emphasis<<6);
+    for(unsigned i=0;i<8;i++)background_frame[pixel+i]=(uint16_t)((values[i]&mask)|high);
+    if(pixel+7==256*240-1)background_valid=true;
+}
 bool cyc_render_background(uint32_t *out) {
     if(!cyc_background_enabled||!background_valid||!out)return false;
     for(unsigned i=0;i<256*240;i++)out[i]=hw_palette_argb[background_frame[i]];
