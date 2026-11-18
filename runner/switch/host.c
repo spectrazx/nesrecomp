@@ -100,7 +100,7 @@ static const char *sprite_kernel_name(void)
 #endif
 }
 typedef struct {
-    Uint64 frames, emulation, audio, present, sleep;
+    Uint64 frames, emulation, audio, present, compose, sleep;
     Uint64 source_samples, queued_bytes, queue_polls, queue_empty_polls;
     Uint32 queue_min, queue_max;
 } FrameTimings;
@@ -110,6 +110,7 @@ static void add_totals(FrameTimings *total, const FrameTimings *part)
     total->emulation += part->emulation;
     total->audio += part->audio;
     total->present += part->present;
+    total->compose += part->compose;
     total->source_samples += part->source_samples;
 }
 static void report_timings(const FrameTimings *t, Uint64 elapsed, Uint64 frequency,
@@ -484,6 +485,7 @@ int cyc_sdl_main(const char *title, int scale)
         const uint32_t *pic = extras && extras->present ? extras->present(extras->ctx, &pic_w, &pic_h) : NULL;
         if (!pic || pic_w <= 0 || pic_h <= 0 || pic_w > CYC_PRESENT_MAX_DIMENSION || pic_h > CYC_PRESENT_MAX_DIMENSION)
             pic = cyc_render_present(&pic_w, &pic_h);
+        timings.compose += SDL_GetPerformanceCounter() - stage;
         if (pic_w != texture_w || pic_h != texture_h) {
             SDL_DestroyTexture(texture);
             texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, pic_w, pic_h);
@@ -536,11 +538,11 @@ int cyc_sdl_main(const char *title, int scale)
         double seconds = (double)(benchmark_ended - benchmark_started) / frequency;
         double per_frame = 1000.0 / (double)frequency / (double)measured.frames;
         runner_log("benchmark kernel=%s frames=%llu warmup_frames=%ld total_frames=%llu "
-                   "seconds=%.6f fps=%.3f emulation_ms=%.6f audio_ms=%.6f present_ms=%.6f "
+                   "seconds=%.6f fps=%.3f emulation_ms=%.6f audio_ms=%.6f present_ms=%.6f compose_ms=%.6f "
                    "audio_supply=%.6f interruptions=%u complete=%u input=%s replay_frames=%llu\n",
             sprite_kernel_name(), (unsigned long long)measured.frames, benchmark_warmup, (unsigned long long)frames,
             seconds, measured.frames / seconds, measured.emulation * per_frame,
-            measured.audio * per_frame, measured.present * per_frame,
+            measured.audio * per_frame, measured.present * per_frame, measured.compose * per_frame,
             (double)measured.source_samples / 48000.0 / seconds, benchmark_interruptions,
             !fatal && !benchmark_interruptions && frames == (Uint64)exit_after && (!replay_path || replay_frames == frames),
             replay_path ? "scripted" : "neutral", (unsigned long long)replay_frames);
